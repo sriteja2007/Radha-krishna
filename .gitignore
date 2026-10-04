@@ -1,0 +1,11 @@
+# Python & OS Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.cache/
+.vscode/
+.idea/
+*.log
+
+# Temporary processing files
+assets/temp_in.jpg

@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Radha–Krishna: 3D Depth Map Story | Three.js Parallax</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  
+  <!-- Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- GSAP for buttery smooth animations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <style>
+    :root {
+      --gold-primary: #f5c869;
+      --gold-light: #fff2c6;
+      --gold-glow: rgba(245, 200, 105, 0.45);
+      --bg-dark: #08070b;
+      --text-muted: rgba(255, 255, 255, 0.72);
+      --font-serif: 'Cinzel', 'Playfair Display', serif;
+      --font-sans: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      color: #fff;
+      font-family: var(--font-sans);
+      cursor: url('assets/cursor/peacock_feather.cur'), url('assets/cursor/peacock_feather_32.png') 4 4, auto;
+    }
+
+    button, a, .brand-pill, .nav-item, input, .control-btn, .store-badge, .scroll-hint, .depth-range {
+      cursor: url('assets/cursor/peacock_pointer.cur'), url('assets/cursor/peacock_pointer_32.png') 10 2, pointer !important;
+    }
+
+    /* WebGL Canvas */
+    #webgl-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      display: block;
+      pointer-events: none;
+    }
+
+    /* Cinematic Vignette & Ambient Glow */
+    .vignette-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 2;
+      pointer-events: none;
+      background: radial-gradient(circle at center, transparent 35%, rgba(6, 4, 10, 0.55) 75%, rgba(4, 2, 8, 0.92) 100%);
+      box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.85);
+    }
+
+    /* UI Layout Wrapper */
+    .ui-layer {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 2.5rem 3.5rem;
+    }
+
+    /* TOP HEADER */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+      pointer-events: auto;
+    }
+
+    .brand-pill {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(18, 16, 26, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(245, 200, 105, 0.22);
+      border-radius: 999px;
+      padding: 7px 18px 7px 8px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(245, 200, 105, 0.08);
+      transition: all 0.35s ease;
+      cursor: pointer;
+    }
+
+    .brand-pill:hover {
+      border-color: rgba(245, 200, 105, 0.5);
+      box-shadow: 0 8px 36px rgba(0, 0, 0, 0.5), 0 0 25px rgba(245, 200, 105, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .brand-icon-box {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f5c869, #e08b35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 10px rgba(245, 200, 105, 0.4);
+    }
+
+    .brand-icon-box svg {
+      width: 20px;
+      height: 20px;
+      fill: #1a0f05;
+    }
+
+    .brand-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title {
+      font-family: var(--font-serif);
+      font-weight: 700;
+      letter-spacing: 2px;
+      font-size: 0.85rem;
+      color: #fff;
+    }
+
+    .brand-sub {
+      font-size: 0.58rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--gold-primary);
+      font-weight: 600;
+    }
+
+    /* HEADER CONTROLS */
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .control-btn {
+      background: rgba(18, 16, 26, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
+      padding: 8px 18px;
+      font-size: 0.76rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      pointer-events: auto;
+      transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+      font-family: var(--font-sans);
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+
+    .control-btn:hover {
+      background: rgba(30, 26, 42, 0.85);
+      border-color: rgba(245, 200, 105, 0.4);
+      color: var(--gold-light);
+      box-shadow: 0 4px 20px rgba(245, 200, 105, 0.15);
+    }
+
+    .control-btn.active {
+      background: linear-gradient(135deg, rgba(245, 200, 105, 0.22), rgba(224, 139, 53, 0.22));
+      border-color: var(--gold-primary);
+      color: var(--gold-light);
+    }
+
+    /* Sound visualizer wave */
+    .sound-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      height: 14px;
+      width: 14px;
+    }
+    .sound-bar {
+      width: 2px;
+      background: var(--gold-primary);
+      border-radius: 1px;
+      height: 4px;
+      transition: height 0.2s ease;
+    }
+    .playing .sound-bar:nth-child(1) { animation: bounce 0.8s ease-in-out infinite alternate; }
+    .playing .sound-bar:nth-child(2) { animation: bounce 0.6s ease-in-out infinite alternate 0.2s; }
+    .playing .sound-bar:nth-child(3) { animation: bounce 0.9s ease-in-out infinite alternate 0.4s; }
+
+    @keyframes bounce {
+      0% { height: 3px; }
+      100% { height: 14px; }
+    }
+
+    /* MAIN STORY CONTENT (LEFT ALIGNED) */
+    .story-container {
+      max-width: 580px;
+      margin-top: auto;
+      margin-bottom: 2rem;
+      pointer-events: auto;
+    }
+
+    .story-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.72rem;
+      letter-spacing: 3.5px;
+      text-transform: uppercase;
+      color: var(--gold-primary);
+      font-weight: 600;
+      margin-bottom: 1rem;
+      opacity: 0.9;
+    }
+
+    .story-tag::before {
+      content: '';
+      width: 24px;
+      height: 1px;
+      background: var(--gold-primary);
+      box-shadow: 0 0 8px var(--gold-primary);
+    }
+
+    .story-title {
+      font-family: var(--font-serif);
+      font-size: clamp(2.4rem, 4.8vw, 3.8rem);
+      line-height: 1.12;
+      font-weight: 700;
+      color: #ffffff;
+      text-shadow: 0 4px 30px rgba(0, 0, 0, 0.85);
+      margin-bottom: 1.2rem;
+      letter-spacing: -0.5px;
+    }
+
+    .story-title span {
+      background: linear-gradient(135deg, #ffffff 40%, var(--gold-light) 75%, var(--gold-primary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .story-desc {
+      font-size: 1.05rem;
+      line-height: 1.68;
+      color: var(--text-muted);
+      font-weight: 300;
+      max-width: 480px;
+      text-shadow: 0 2px 14px rgba(0, 0, 0, 0.9);
+      margin-bottom: 2rem;
+    }
+
+    /* FOOTER BADGES & CONTROLS */
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      width: 100%;
+      pointer-events: auto;
+    }
+
+    .store-badges {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .store-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(14, 12, 22, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 12px;
+      padding: 9px 18px;
+      color: #fff;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .store-badge:hover {
+      border-color: rgba(245, 200, 105, 0.5);
+      background: rgba(26, 22, 38, 0.9);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 15px rgba(245, 200, 105, 0.15);
+    }
+
+    .badge-icon {
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .badge-icon svg {
+      width: 100%;
+      height: 100%;
+      fill: currentColor;
+    }
+
+    .badge-texts {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .badge-label {
+      font-size: 0.55rem;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      opacity: 0.75;
+    }
+
+    .badge-name {
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+
+    /* RIGHT VERTICAL CHAPTER NAVIGATION */
+    .chapter-nav {
+      position: fixed;
+      right: 3rem;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 15;
+      display: flex;
+      flex-direction: column;
+      gap: 1.4rem;
+      pointer-events: auto;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      flex-direction: row-reverse;
+      group: nav;
+    }
+
+    .nav-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      transition: all 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .nav-item:hover .nav-dot {
+      background: var(--gold-light);
+      transform: scale(1.4);
+      box-shadow: 0 0 12px var(--gold-glow);
+    }
+
+    .nav-item.active .nav-dot {
+      width: 10px;
+      height: 24px;
+      border-radius: 12px;
+      background: linear-gradient(to bottom, #fff, var(--gold-primary));
+      border-color: var(--gold-primary);
+      box-shadow: 0 0 16px var(--gold-glow);
+    }
+
+    .nav-label {
+      font-size: 0.72rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.4);
+      font-weight: 600;
+      opacity: 0;
+      transform: translateX(10px);
+      transition: all 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .nav-item:hover .nav-label,
+    .nav-item.active .nav-label {
+      opacity: 1;
+      transform: translateX(0);
+      color: var(--gold-light);
+    }
+
+    /* DEPTH STRENGTH CONTROLLER (BOTTOM RIGHT) */
+    .depth-slider-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(18, 16, 26, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
+      padding: 7px 18px;
+      color: #fff;
+    }
+
+    .slider-label {
+      font-size: 0.68rem;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--gold-primary);
+      font-weight: 600;
+    }
+
+    .depth-range {
+      -webkit-appearance: none;
+      width: 80px;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.2);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .depth-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--gold-primary);
+      box-shadow: 0 0 8px var(--gold-glow);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .depth-range::-webkit-slider-thumb:hover {
+      transform: scale(1.25);
+    }
+
+    /* SCROLL HINT */
+    .scroll-hint {
+      position: fixed;
+      bottom: 2.2rem;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 15;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      pointer-events: auto;
+      cursor: pointer;
+      opacity: 0.75;
+      transition: opacity 0.3s ease;
+    }
+    .scroll-hint:hover {
+      opacity: 1;
+    }
+    .scroll-text {
+      font-size: 0.65rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--gold-light);
+      font-weight: 500;
+    }
+    .scroll-chevron {
+      width: 14px;
+      height: 14px;
+      animation: floatChevron 1.8s ease-in-out infinite;
+    }
+    @keyframes floatChevron {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(6px); }
+    }
+
+    /* ========================================================
+       CURSOR STYLES - CUSTOMIZE HERE
+       To change color, size, or replace with an image / peacock feather
+       ======================================================== */
+    .cursor-parallax-cue {
+      position: fixed;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(245, 200, 105, 0.35) 0%, rgba(56, 189, 248, 0.18) 55%, transparent 75%);
+      box-shadow: 0 0 16px rgba(245, 200, 105, 0.3);
+      border: 1px solid rgba(245, 200, 105, 0.35);
+      pointer-events: none;
+      z-index: 100;
+      transform: translate(-50%, -50%);
+      transition: width 0.25s ease, height 0.25s ease, background 0.25s ease, border-color 0.25s ease;
+      mix-blend-mode: screen;
+    }
+
+    /* Hover effect over interactive buttons */
+    .cursor-parallax-cue.hovering {
+      width: 48px;
+      height: 48px;
+      border-color: rgba(112, 188, 255, 0.85);
+      background: radial-gradient(circle, rgba(112, 188, 255, 0.45) 0%, rgba(245, 200, 105, 0.25) 55%, transparent 80%);
+      box-shadow: 0 0 25px rgba(112, 188, 255, 0.6);
+    }
+
+    /* ========================================================
+       RESPONSIVE DESIGN (LAPTOP & MOBILE)
+       ======================================================== */
+    @media (hover: none) and (pointer: coarse) {
+      /* On mobile / touchscreens, hide mouse trailing cursor so it doesn't freeze in place */
+      .cursor-parallax-cue {
+        display: none !important;
+      }
+      body, html {
+        cursor: auto !important;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .ui-layer {
+        padding: 1.25rem 1.25rem;
+      }
+      .header {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .brand-pill {
+        padding: 5px 14px 5px 6px;
+      }
+      .brand-title {
+        font-size: 0.8rem;
+      }
+      .brand-sub {
+        font-size: 0.52rem;
+      }
+      .header-controls {
+        gap: 8px;
+      }
+      .control-btn {
+        padding: 6px 13px;
+        font-size: 0.72rem;
+      }
+      .chapter-nav {
+        right: 0.8rem;
+        gap: 0.9rem;
+      }
+      .nav-label {
+        display: none;
+      }
+      .nav-item {
+        padding: 4px;
+      }
+      .nav-dot {
+        width: 10px;
+        height: 10px;
+      }
+      .story-container {
+        max-width: 100%;
+        margin-bottom: 1.2rem;
+        background: linear-gradient(180deg, rgba(8, 7, 11, 0.2) 0%, rgba(8, 7, 11, 0.65) 30%, rgba(8, 7, 11, 0.92) 100%);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border: 1px solid rgba(245, 200, 105, 0.15);
+        border-radius: 20px;
+        padding: 1.25rem 1.25rem 1rem 1.25rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+      }
+      .story-tag {
+        font-size: 0.65rem;
+        letter-spacing: 2px;
+        margin-bottom: 0.5rem;
+      }
+      .story-title {
+        font-size: clamp(1.75rem, 6.5vw, 2.5rem);
+        line-height: 1.15;
+        margin-bottom: 0.6rem;
+      }
+      .story-desc {
+        font-size: 0.88rem;
+        line-height: 1.55;
+        margin-bottom: 0.5rem;
+      }
+      .footer {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .store-badges {
+        width: 100%;
+        gap: 10px;
+      }
+      .store-badge {
+        padding: 7px 12px;
+        flex: 1;
+        justify-content: center;
+      }
+      .badge-label {
+        font-size: 0.5rem;
+      }
+      .badge-name {
+        font-size: 0.75rem;
+      }
+      .depth-slider-container {
+        width: 100%;
+        justify-content: space-between;
+        padding: 6px 14px;
+      }
+      .depth-range {
+        flex: 1;
+        margin-left: 12px;
+      }
+      .scroll-hint {
+        display: none;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .ui-layer {
+        padding: 0.9rem 0.85rem;
+      }
+      .brand-title {
+        font-size: 0.74rem;
+        letter-spacing: 1.5px;
+      }
+      .brand-sub {
+        display: none;
+      }
+      .control-btn span {
+        display: none; /* Compact icon mode on phones */
+      }
+      .control-btn {
+        padding: 8px 10px;
+      }
+      .story-container {
+        padding: 1rem;
+        border-radius: 16px;
+      }
+      .story-title {
+        font-size: 1.65rem;
+      }
+      .story-desc {
+        font-size: 0.82rem;
+        line-height: 1.5;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- WebGL Render Canvas -->
+  <canvas id="webgl-canvas"></canvas>
+
+  <!-- Ambient Vignette -->
+  <div class="vignette-overlay"></div>
+
+  <!-- Interactive Parallax Cursor Dot -->
+  <div class="cursor-parallax-cue" id="cursor-cue"></div>
+
+  <!-- Foreground UI Overlay -->
+  <div class="ui-layer">
+    
+    <!-- TOP HEADER -->
+    <header class="header">
+      <div class="brand-pill" title="Shrunoti - Ocean of Stories">
+        <div class="brand-icon-box">
+          <!-- Conch / Sacred Shell SVG Icon -->
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">SHRUNOTI</span>
+          <span class="brand-sub">OCEAN OF STORIES</span>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <!-- Depth Map Inspection Toggle -->
+        <button class="control-btn" id="btn-depth-toggle" title="Toggle Depth Map view">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+          <span id="depth-btn-text">Depth View</span>
+        </button>
+
+        <!-- Mobile Gyroscope 3D Motion Toggle -->
+        <button class="control-btn" id="btn-gyro-toggle" title="Enable 3D Motion on Phone / Tilt">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+            <line x1="12" y1="18" x2="12.01" y2="18"></line>
+          </svg>
+          <span id="gyro-btn-text">3D Tilt</span>
+        </button>
+
+        <!-- Ambient Bansuri Flute Sound Toggle -->
+        <button class="control-btn" id="btn-audio-toggle" title="Toggle Divine Flute Audio">
+          <div class="sound-bars" id="sound-visualizer">
+            <div class="sound-bar"></div>
+            <div class="sound-bar"></div>
+            <div class="sound-bar"></div>
+          </div>
+          <span id="audio-btn-text">Divine Audio</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- STORY SECTION (DYNAMIC TEXT ON SCROLL) -->
+    <main class="story-container">
+      <div class="story-tag" id="story-tag">A SONG FROM ANOTHER LIFE</div>
+      <h1 class="story-title" id="story-title">She does not<br><span>remember him</span></h1>
+      <p class="story-desc" id="story-desc">
+        In the quiet chambers of Vrindavan, a forgotten memory stirs. An echo of a melody heard before the stars were born.
+      </p>
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      <div class="store-badges">
+        <a href="#" class="store-badge" title="Google Play">
+          <div class="badge-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M3.609 1.814L13.792 12 3.61 22.186c-.347-.323-.559-.79-.559-1.32V3.134c0-.53.212-.997.558-1.32zm11.242 11.245l2.483-2.483-11.83-6.83 9.347 9.313zm2.483-2.483l3.864 2.231c.78.45.78 1.186 0 1.637l-3.864 2.231-2.073-2.073 2.073-2.026zM5.504 20.255l11.83-6.83-2.483-2.483-9.347 9.313z"/>
+            </svg>
+          </div>
+          <div class="badge-texts">
+            <span class="badge-label">GET IT ON</span>
+            <span class="badge-name">Google Play</span>
+          </div>
+        </a>
+
+        <a href="#" class="store-badge" title="App Store">
+          <div class="badge-icon">
+            <svg viewBox="0 0 24 24">
+              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.61-.75 1.04-1.8 0.92-2.85-.9.04-2 .6-2.65 1.35-.58.66-1.09 1.73-.96 2.76 1.01.08 2.07-.51 2.69-1.26z"/>
+            </svg>
+          </div>
+          <div class="badge-texts">
+            <span class="badge-label">Download on the</span>
+            <span class="badge-name">App Store</span>
+          </div>
+        </a>
+      </div>
+
+      <!-- Depth Strength Slider -->
+      <div class="depth-slider-container">
+        <span class="slider-label">3D Intensity</span>
+        <input type="range" class="depth-range" id="depth-strength" min="0.01" max="0.08" step="0.005" value="0.035">
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- RIGHT CHAPTER NAVIGATION -->
+  <nav class="chapter-nav" id="chapter-nav">
+    <div class="nav-item active" data-index="0">
+      <span class="nav-label">The Awakening</span>
+      <div class="nav-dot"></div>
+    </div>
+    <div class="nav-item" data-index="1">
+      <span class="nav-label">The Painting</span>
+      <div class="nav-dot"></div>
+    </div>
+    <div class="nav-item" data-index="2">
+      <span class="nav-label">The Silver Moon</span>
+      <div class="nav-dot"></div>
+    </div>
+    <div class="nav-item" data-index="3">
+      <span class="nav-label">The Eternal Song</span>
+      <div class="nav-dot"></div>
+    </div>
+    <div class="nav-item" data-index="4">
+      <span class="nav-label">The Arrival</span>
+      <div class="nav-dot"></div>
+    </div>
+  </nav>
+
+  <!-- SCROLL INDICATOR -->
+  <div class="scroll-hint" id="scroll-hint">
+    <span class="scroll-text">Scroll or Swipe</span>
+    <svg class="scroll-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M7 10l5 5 5-5"></path>
+    </svg>
+  </div>
+
+  <!-- ==================== THREE.JS & WEBGL SHADER SCRIPT ==================== -->
+  <script>
+    // Chapter data for all 5 Radha–Krishna scenes
+    const CHAPTERS = [
+      {
+        tag: "A SONG FROM ANOTHER LIFE",
+        title: "She does not<br><span>remember him</span>",
+        desc: "In the quiet chambers of Vrindavan, a forgotten memory stirs. An echo of a melody heard before the stars were born.",
+        image: "assets/image_1.jpg",
+        depth: "assets/depth_1.jpg"
+      },
+      {
+        tag: "THE SACRED CHANDAN",
+        title: "He paints memories<br><span>upon her palm</span>",
+        desc: "With peacock feather and sacred dye, every brush stroke whispers what words could never tell.",
+        image: "assets/image_2.jpg",
+        depth: "assets/depth_2.jpg"
+      },
+      {
+        tag: "UNDER THE SILVER MOON",
+        title: "The sacred flute<br><span>calls across time</span>",
+        desc: "Upon eternal waters beneath the silver purnima moon, the cosmic peacock bows as the divine song fills the universe.",
+        image: "assets/image_3.jpg",
+        depth: "assets/depth_3.jpg"
+      },
+      {
+        tag: "THE ETERNAL MELODY",
+        title: "Closing her eyes,<br><span>she awakens</span>",
+        desc: "In the warm cascade of golden lights, all longing dissolves. Two hearts beating to the single celestial rhythm.",
+        image: "assets/image_4.jpg",
+        depth: "assets/depth_4.jpg"
+      },
+      {
+        tag: "THE DIVINE REUNION",
+        title: "And he arrives,<br><span>forever remembered</span>",
+        desc: "The Vrindavan blossoms in eternal spring. What was once forgotten now shines brighter than a thousand suns.",
+        image: "assets/image_5.jpg",
+        depth: "assets/depth_5.jpg"
+      }
+    ];
+
+    let currentChapterIndex = 0;
+    let isTransitioning = false;
+    let depthOnlyMode = false;
+
+    // --- WebGL & Three.js Setup ---
+    const canvas = document.getElementById('webgl-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+    // Texture Loader
+    const textureLoader = new THREE.TextureLoader();
+    const loadedTextures = {
+      images: [],
+      depths: []
+    };
+
+    // Preload textures
+    CHAPTERS.forEach((ch, idx) => {
+      const imgTex = textureLoader.load(ch.image);
+      const depthTex = textureLoader.load(ch.depth);
+      imgTex.minFilter = THREE.LinearFilter;
+      imgTex.magFilter = THREE.LinearFilter;
+      imgTex.generateMipmaps = false;
+      depthTex.minFilter = THREE.LinearFilter;
+      depthTex.magFilter = THREE.LinearFilter;
+      depthTex.generateMipmaps = false;
+      loadedTextures.images[idx] = imgTex;
+      loadedTextures.depths[idx] = depthTex;
+    });
+
+    // Custom Shader Vertex
+    const vertexShader = `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position, 1.0);
+      }
+    `;
+
+    // Custom Shader Fragment with (depth - 0.45) * mouse offset displacement
+    const fragmentShader = `
+      uniform sampler2D u_imgCurrent;
+      uniform sampler2D u_depthCurrent;
+      uniform sampler2D u_imgNext;
+      uniform sampler2D u_depthNext;
+
+      uniform float u_transition; // 0.0 = current, 1.0 = next
+      uniform vec2 u_mouse;       // smoothed mouse offset [-1.0 .. 1.0]
+      uniform vec2 u_drift;       // idle gentle breathing drift
+      uniform float u_focus;      // 0.45 focus anchor point
+      uniform float u_intensity;  // displacement strength
+      uniform vec2 u_resolution;  // canvas size
+      uniform vec2 u_imageRes;    // image aspect size
+      uniform bool u_depthView;   // view raw depth map
+
+      varying vec2 vUv;
+
+      // Cover-fit UV mapping to prevent stretching on any screen aspect ratio
+      vec2 getCoverUv(vec2 uv, vec2 screenRes, vec2 imgRes) {
+        float screenAspect = screenRes.x / screenRes.y;
+        float imgAspect = imgRes.x / imgRes.y;
+        vec2 newUv = uv;
+        if (screenAspect > imgAspect) {
+          float scale = imgAspect / screenAspect;
+          newUv.y = (uv.y - 0.5) * scale + 0.5;
+        } else {
+          float scale = screenAspect / imgAspect;
+          newUv.x = (uv.x - 0.5) * scale + 0.5;
+        }
+        return newUv;
+      }
+
+      void main() {
+        vec2 coverUv = getCoverUv(vUv, u_resolution, u_imageRes);
+        
+        // Total displacement offset vector (mouse interaction + subtle idle breathing)
+        vec2 totalOffset = (u_mouse + u_drift);
+
+        // 1. Current Scene Depth & Displacement
+        float depthCur = texture2D(u_depthCurrent, coverUv).r;
+        vec2 uvDisplacedCur = coverUv + (depthCur - u_focus) * totalOffset * u_intensity;
+
+        // Subtle chromatic aberration on edges for cinematic feel
+        float rCur = texture2D(u_imgCurrent, uvDisplacedCur + totalOffset * u_intensity * 0.05).r;
+        float gCur = texture2D(u_imgCurrent, uvDisplacedCur).g;
+        float bCur = texture2D(u_imgCurrent, uvDisplacedCur - totalOffset * u_intensity * 0.05).b;
+        vec4 colorCur = vec4(rCur, gCur, bCur, 1.0);
+
+        // 2. Next Scene (when transitioning)
+        float depthNxt = texture2D(u_depthNext, coverUv).r;
+        vec2 uvDisplacedNxt = coverUv + (depthNxt - u_focus) * totalOffset * u_intensity;
+        float rNxt = texture2D(u_imgNext, uvDisplacedNxt + totalOffset * u_intensity * 0.05).r;
+        float gNxt = texture2D(u_imgNext, uvDisplacedNxt).g;
+        float bNxt = texture2D(u_imgNext, uvDisplacedNxt - totalOffset * u_intensity * 0.05).b;
+        vec4 colorNxt = vec4(rNxt, gNxt, bNxt, 1.0);
+
+        // Depth Map Inspection Mode
+        if (u_depthView) {
+          float d = mix(depthCur, depthNxt, u_transition);
+          gl_FragColor = vec4(vec3(d), 1.0);
+          return;
+        }
+
+        // Depth-based dissolve blend
+        float blendFactor = smoothstep(0.0, 1.0, u_transition);
+        vec4 finalColor = mix(colorCur, colorNxt, blendFactor);
+
+        gl_FragColor = finalColor;
+      }
+    `;
+
+    // Uniforms
+    const uniforms = {
+      u_imgCurrent: { value: loadedTextures.images[0] },
+      u_depthCurrent: { value: loadedTextures.depths[0] },
+      u_imgNext: { value: loadedTextures.images[0] },
+      u_depthNext: { value: loadedTextures.depths[0] },
+      u_transition: { value: 0.0 },
+      u_mouse: { value: new THREE.Vector2(0, 0) },
+      u_drift: { value: new THREE.Vector2(0, 0) },
+      u_focus: { value: 0.45 }, // Exact focus depth from workflow: (depth - 0.45)
+      u_intensity: { value: 0.035 },
+      u_resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+      u_imageRes: { value: new THREE.Vector2(1920, 1080) },
+      u_depthView: { value: false }
+    };
+
+    const material = new THREE.ShaderMaterial({
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
+      uniforms: uniforms,
+      depthTest: false,
+      depthWrite: false
+    });
+
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    const quad = new THREE.Mesh(geometry, material);
+    scene.add(quad);
+
+    // --- Interactive Mouse & Idle Drift Handling ---
+    let targetMouseX = 0;
+    let targetMouseY = 0;
+    let smoothMouseX = 0;
+    let smoothMouseY = 0;
+    const cursorCue = document.getElementById('cursor-cue');
+
+    window.addEventListener('mousemove', (e) => {
+      // Normalize to [-1.0, 1.0]
+      targetMouseX = (e.clientX / window.innerWidth) * 2 - 1;
+      targetMouseY = -((e.clientY / window.innerHeight) * 2 - 1);
+
+      cursorCue.style.left = e.clientX + 'px';
+      cursorCue.style.top = e.clientY + 'px';
+    });
+
+    // Touch support for mobile / tablets
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches.length > 0) {
+        targetMouseX = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
+        targetMouseY = -((e.touches[0].clientY / window.innerHeight) * 2 - 1);
+        cursorCue.style.left = e.touches[0].clientX + 'px';
+        cursorCue.style.top = e.touches[0].clientY + 'px';
+      }
+    }, { passive: true });
+
+    // Gyroscope / Device orientation support for mobile 3D holographic tilt
+    let gyroActive = false;
+    const btnGyroToggle = document.getElementById('btn-gyro-toggle');
+    const gyroBtnText = document.getElementById('gyro-btn-text');
+
+    function handleOrientation(e) {
+      if (e.gamma !== null && e.beta !== null) {
+        // gamma: left-to-right [-90..90], beta: front-to-back [-180..180]
+        targetMouseX = Math.min(Math.max(e.gamma / 18, -1), 1);
+        targetMouseY = Math.min(Math.max((e.beta - 45) / 22, -1), 1);
+      }
+    }
+
+    if (btnGyroToggle) {
+      btnGyroToggle.addEventListener('click', () => {
+        if (!gyroActive) {
+          if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            DeviceOrientationEvent.requestPermission()
+              .then(res => {
+                if (res === 'granted') {
+                  window.addEventListener('deviceorientation', handleOrientation);
+                  gyroActive = true;
+                  btnGyroToggle.classList.add('active');
+                  gyroBtnText.textContent = "Tilt ON";
+                }
+              })
+              .catch(err => console.log('Gyro error:', err));
+          } else {
+            window.addEventListener('deviceorientation', handleOrientation);
+            gyroActive = true;
+            btnGyroToggle.classList.add('active');
+            gyroBtnText.textContent = "Tilt ON";
+          }
+        } else {
+          window.removeEventListener('deviceorientation', handleOrientation);
+          gyroActive = false;
+          btnGyroToggle.classList.remove('active');
+          gyroBtnText.textContent = "3D Tilt";
+        }
+      });
+    }
+
+    // Window Resize
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+    });
+
+    // --- Scene Transition Engine ---
+    function goToChapter(index) {
+      if (index === currentChapterIndex || isTransitioning) return;
+      isTransitioning = true;
+
+      const nextIndex = (index + CHAPTERS.length) % CHAPTERS.length;
+      
+      // Update next textures
+      uniforms.u_imgNext.value = loadedTextures.images[nextIndex];
+      uniforms.u_depthNext.value = loadedTextures.depths[nextIndex];
+      uniforms.u_transition.value = 0.0;
+
+      // Update Nav Dots
+      document.querySelectorAll('.nav-item').forEach((item, idx) => {
+        item.classList.toggle('active', idx === nextIndex);
+      });
+
+      // Animate text out
+      const tagEl = document.getElementById('story-tag');
+      const titleEl = document.getElementById('story-title');
+      const descEl = document.getElementById('story-desc');
+
+      gsap.to([tagEl, titleEl, descEl], {
+        opacity: 0,
+        y: -15,
+        duration: 0.4,
+        stagger: 0.05,
+        ease: "power2.in",
+        onComplete: () => {
+          // Change text
+          tagEl.innerHTML = CHAPTERS[nextIndex].tag;
+          titleEl.innerHTML = CHAPTERS[nextIndex].title;
+          descEl.innerHTML = CHAPTERS[nextIndex].desc;
+
+          // Animate text back in
+          gsap.fromTo([tagEl, titleEl, descEl], 
+            { opacity: 0, y: 20 },
+            { opacity: 1, y: 0, duration: 0.65, stagger: 0.1, ease: "power3.out" }
+          );
+        }
+      });
+
+      // Animate WebGL crossfade
+      gsap.to(uniforms.u_transition, {
+        value: 1.0,
+        duration: 1.1,
+        ease: "power2.inOut",
+        onComplete: () => {
+          // Set current to next
+          uniforms.u_imgCurrent.value = loadedTextures.images[nextIndex];
+          uniforms.u_depthCurrent.value = loadedTextures.depths[nextIndex];
+          uniforms.u_transition.value = 0.0;
+          currentChapterIndex = nextIndex;
+          isTransitioning = false;
+        }
+      });
+
+      // Play soft harmonic note if sound is enabled
+      playSceneChime(nextIndex);
+    }
+
+    // Scroll & Wheel Navigation
+    let wheelThrottle = false;
+    window.addEventListener('wheel', (e) => {
+      if (wheelThrottle) return;
+      if (Math.abs(e.deltaY) > 25) {
+        wheelThrottle = true;
+        if (e.deltaY > 0) {
+          goToChapter(currentChapterIndex + 1);
+        } else {
+          goToChapter(currentChapterIndex - 1);
+        }
+        setTimeout(() => { wheelThrottle = false; }, 1100);
+      }
+    }, { passive: true });
+
+    // Touch Swipe Navigation
+    let touchStartY = 0;
+    window.addEventListener('touchstart', (e) => {
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+
+    window.addEventListener('touchend', (e) => {
+      const diffY = touchStartY - e.changedTouches[0].clientY;
+      if (Math.abs(diffY) > 50) {
+        if (diffY > 0) {
+          goToChapter(currentChapterIndex + 1);
+        } else {
+          goToChapter(currentChapterIndex - 1);
+        }
+      }
+    }, { passive: true });
+
+    // Keyboard Navigation
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
+        goToChapter(currentChapterIndex + 1);
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        goToChapter(currentChapterIndex - 1);
+      }
+    });
+
+    // Nav Dots Click
+    document.querySelectorAll('.nav-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        const idx = parseInt(item.getAttribute('data-index'));
+        goToChapter(idx);
+      });
+    });
+
+    // Scroll Hint Click
+    document.getElementById('scroll-hint').addEventListener('click', () => {
+      goToChapter(currentChapterIndex + 1);
+    });
+
+    // 3D Intensity Slider
+    const intensitySlider = document.getElementById('depth-strength');
+    intensitySlider.addEventListener('input', (e) => {
+      uniforms.u_intensity.value = parseFloat(e.target.value);
+    });
+
+    // Depth Map Toggle View
+    const btnDepthToggle = document.getElementById('btn-depth-toggle');
+    const depthBtnText = document.getElementById('depth-btn-text');
+    btnDepthToggle.addEventListener('click', () => {
+      depthOnlyMode = !depthOnlyMode;
+      uniforms.u_depthView.value = depthOnlyMode;
+      btnDepthToggle.classList.toggle('active', depthOnlyMode);
+      depthBtnText.textContent = depthOnlyMode ? "Photo View" : "Depth View";
+    });
+
+    // --- Audio System: Custom Song MP3 + Procedural Synthesis Fallback ---
+    // TO CHANGE THE SONG:
+    // Simply place your MP3 file in the "assets/" folder and name it "song.mp3",
+    // or change the path below to any local file or web link (e.g. "assets/my_music.mp3")!
+    const customAudio = new Audio("assets/song.mp3");
+    customAudio.loop = true;
+    customAudio.volume = 0.6;
+    let customAudioAvailable = false;
+
+    // Detect if custom MP3 file exists
+    customAudio.addEventListener('canplaythrough', () => {
+      customAudioAvailable = true;
+    });
+    customAudio.addEventListener('error', () => {
+      customAudioAvailable = false;
+    });
+
+    let audioCtx = null;
+    let isAudioPlaying = false;
+    let masterGain = null;
+    let droneOscs = [];
+
+    const btnAudioToggle = document.getElementById('btn-audio-toggle');
+    const soundVisualizer = document.getElementById('sound-visualizer');
+    const audioBtnText = document.getElementById('audio-btn-text');
+
+    function initAudio() {
+      if (audioCtx) return;
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContext();
+
+      masterGain = audioCtx.createGain();
+      masterGain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+      masterGain.connect(audioCtx.destination);
+
+      // Create Tanpura drone (Indian Classical Sa-Pa pure harmonics: 146.83Hz D3, 220Hz A3)
+      const droneFreqs = [146.83, 220.0, 293.66, 440.0];
+      droneFreqs.forEach((freq, i) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = i % 2 === 0 ? 'sine' : 'triangle';
+        osc.frequency.setValueAtTime(freq + (Math.random() - 0.5) * 0.4, audioCtx.currentTime);
+        
+        // Gentle LFO for natural breath vibrato
+        const lfo = audioCtx.createOscillator();
+        lfo.frequency.setValueAtTime(0.2 + i * 0.1, audioCtx.currentTime);
+        const lfoGain = audioCtx.createGain();
+        lfoGain.gain.setValueAtTime(0.015, audioCtx.currentTime);
+        lfo.connect(lfoGain.gain);
+        lfo.start();
+
+        gain.gain.setValueAtTime(0.06 / (i + 1), audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start();
+        droneOscs.push(osc);
+      });
+    }
+
+    function playSceneChime(sceneIdx) {
+      if (!isAudioPlaying) return;
+      
+      // If playing custom MP3, we don't need synthetic chimes
+      if (customAudioAvailable && !customAudio.paused) return;
+
+      if (!audioCtx) return;
+      // Raga Bhupali / Yaman scale notes: Sa, Re, Ga, Pa, Dha
+      const notes = [293.66, 329.63, 369.99, 440.0, 493.88];
+      const rootFreq = notes[sceneIdx % notes.length];
+
+      const chimeOsc = audioCtx.createOscillator();
+      const chimeGain = audioCtx.createGain();
+      chimeOsc.type = 'sine';
+      chimeOsc.frequency.setValueAtTime(rootFreq * 2, audioCtx.currentTime);
+
+      chimeGain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+      chimeGain.gain.exponentialRampToValueAtTime(0.12, audioCtx.currentTime + 0.15);
+      chimeGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 3.0);
+
+      chimeOsc.connect(chimeGain);
+      chimeGain.connect(masterGain);
+      chimeOsc.start();
+      chimeOsc.stop(audioCtx.currentTime + 3.2);
+    }
+
+    btnAudioToggle.addEventListener('click', () => {
+      isAudioPlaying = !isAudioPlaying;
+
+      if (isAudioPlaying) {
+        // Try playing user's custom MP3 first
+        customAudio.play().then(() => {
+          customAudioAvailable = true;
+          btnAudioToggle.classList.add('active');
+          soundVisualizer.classList.add('playing');
+          audioBtnText.textContent = "Song Playing";
+        }).catch(() => {
+          // If no MP3 file or browser prevented, fall back to procedural flute synth
+          initAudio();
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+          masterGain.gain.setTargetAtTime(0.25, audioCtx.currentTime, 0.8);
+          btnAudioToggle.classList.add('active');
+          soundVisualizer.classList.add('playing');
+          audioBtnText.textContent = "Divine Audio";
+          playSceneChime(currentChapterIndex);
+        });
+      } else {
+        if (!customAudio.paused) {
+          customAudio.pause();
+        }
+        if (audioCtx && masterGain) {
+          masterGain.gain.setTargetAtTime(0.0001, audioCtx.currentTime, 0.4);
+        }
+        btnAudioToggle.classList.remove('active');
+        soundVisualizer.classList.remove('playing');
+        audioBtnText.textContent = "Play Music";
+      }
+    });
+
+    // Add interactive magnetic hover on buttons for cursor
+    document.querySelectorAll('button, a, .brand-pill, .nav-item, input').forEach(el => {
+      el.addEventListener('mouseenter', () => cursorCue.classList.add('hovering'));
+      el.addEventListener('mouseleave', () => cursorCue.classList.remove('hovering'));
+    });
+
+    // --- Render Loop with Smooth Lerp & Idle Breathing ---
+    let clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsedTime = clock.getElapsedTime();
+
+      // Smooth mouse lerp (buttery soft deceleration)
+      smoothMouseX += (targetMouseX - smoothMouseX) * 0.06;
+      smoothMouseY += (targetMouseY - smoothMouseY) * 0.06;
+      uniforms.u_mouse.value.set(smoothMouseX, smoothMouseY);
+
+      // Idle breathing drift (subtle floating motion when mouse is still)
+      const driftX = Math.sin(elapsedTime * 0.65) * 0.2 + Math.cos(elapsedTime * 0.35) * 0.1;
+      const driftY = Math.cos(elapsedTime * 0.5) * 0.2 + Math.sin(elapsedTime * 0.25) * 0.1;
+      uniforms.u_drift.value.set(driftX, driftY);
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>

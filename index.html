@@ -803,45 +803,99 @@
 
   <!-- ==================== THREE.JS & WEBGL SHADER SCRIPT ==================== -->
   <script>
-    // Chapter data for all 5 Radha–Krishna scenes
-    const CHAPTERS = [
+    // Laptop / Desktop chapters (Landscape 16:9 images)
+    const DESKTOP_CHAPTERS = [
       {
         tag: "A SONG FROM ANOTHER LIFE",
         title: "She does not<br><span>remember him</span>",
         desc: "In the quiet chambers of Vrindavan, a forgotten memory stirs. An echo of a melody heard before the stars were born.",
         image: "assets/image_1.jpg",
-        depth: "assets/depth_1.jpg"
+        depth: "assets/depth_1.jpg",
+        aspect: [1920, 1080]
       },
       {
         tag: "THE SACRED CHANDAN",
         title: "He paints memories<br><span>upon her palm</span>",
         desc: "With peacock feather and sacred dye, every brush stroke whispers what words could never tell.",
         image: "assets/image_2.jpg",
-        depth: "assets/depth_2.jpg"
+        depth: "assets/depth_2.jpg",
+        aspect: [1920, 1080]
       },
       {
         tag: "UNDER THE SILVER MOON",
         title: "The sacred flute<br><span>calls across time</span>",
         desc: "Upon eternal waters beneath the silver purnima moon, the cosmic peacock bows as the divine song fills the universe.",
         image: "assets/image_3.jpg",
-        depth: "assets/depth_3.jpg"
+        depth: "assets/depth_3.jpg",
+        aspect: [1920, 1080]
       },
       {
         tag: "THE ETERNAL MELODY",
         title: "Closing her eyes,<br><span>she awakens</span>",
         desc: "In the warm cascade of golden lights, all longing dissolves. Two hearts beating to the single celestial rhythm.",
         image: "assets/image_4.jpg",
-        depth: "assets/depth_4.jpg"
+        depth: "assets/depth_4.jpg",
+        aspect: [1920, 1080]
       },
       {
         tag: "THE DIVINE REUNION",
         title: "And he arrives,<br><span>forever remembered</span>",
         desc: "The Vrindavan blossoms in eternal spring. What was once forgotten now shines brighter than a thousand suns.",
         image: "assets/image_5.jpg",
-        depth: "assets/depth_5.jpg"
+        depth: "assets/depth_5.jpg",
+        aspect: [1920, 1080]
       }
     ];
 
+    // Mobile Phone chapters (Vertical 9:16 portrait images)
+    const MOBILE_CHAPTERS = [
+      {
+        tag: "A SONG FROM ANOTHER LIFE",
+        title: "She does not<br><span>remember him</span>",
+        desc: "In the quiet chambers of Vrindavan, a forgotten memory stirs. An echo of a melody heard before the stars were born.",
+        image: "assets/mobile_image_1.jpg",
+        depth: "assets/mobile_depth_1.jpg",
+        aspect: [735, 919]
+      },
+      {
+        tag: "THE CELESTIAL MELODY",
+        title: "Eyes closed in<br><span>divine devotion</span>",
+        desc: "As the flute rests against his lips, their breaths align into one celestial harmony that transcends realms.",
+        image: "assets/mobile_image_2.jpg",
+        depth: "assets/mobile_depth_2.jpg",
+        aspect: [571, 1024]
+      },
+      {
+        tag: "THE VRINDAVAN SWING",
+        title: "Encircled in blossoms<br><span>of eternal love</span>",
+        desc: "Suspended in garlands of jasmine and lotus, every flower in the sacred groves carries their whispered name.",
+        image: "assets/mobile_image_3.jpg",
+        depth: "assets/mobile_depth_3.jpg",
+        aspect: [736, 920]
+      },
+      {
+        tag: "THE TIMELESS GAZE",
+        title: "Looking upon the<br><span>eternal beloved</span>",
+        desc: "In monochrome timelessness, beyond colours and worldly illusion, soul meets soul in pure stillness.",
+        image: "assets/mobile_image_4.jpg",
+        depth: "assets/mobile_depth_4.jpg",
+        aspect: [576, 1024]
+      },
+      {
+        tag: "THE DIVINE REUNION",
+        title: "And he arrives,<br><span>forever remembered</span>",
+        desc: "Beneath the glowing pink veil, the eternal dance resumes. What was once forgotten is now forever remembered.",
+        image: "assets/mobile_image_5.jpg",
+        depth: "assets/mobile_depth_5.jpg",
+        aspect: [571, 1024]
+      }
+    ];
+
+    function isMobileDevice() {
+      return window.innerWidth <= 768 || (window.innerWidth < window.innerHeight && window.innerWidth <= 1024);
+    }
+
+    let isMobile = isMobileDevice();
     let currentChapterIndex = 0;
     let isTransitioning = false;
     let depthOnlyMode = false;
@@ -855,15 +909,13 @@
     const scene = new THREE.Scene();
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
 
-    // Texture Loader
+    // Texture Loaders for Desktop & Mobile
     const textureLoader = new THREE.TextureLoader();
-    const loadedTextures = {
-      images: [],
-      depths: []
-    };
+    const desktopTextures = { images: [], depths: [] };
+    const mobileTextures = { images: [], depths: [] };
 
-    // Preload textures
-    CHAPTERS.forEach((ch, idx) => {
+    // Preload Desktop Textures
+    DESKTOP_CHAPTERS.forEach((ch, idx) => {
       const imgTex = textureLoader.load(ch.image);
       const depthTex = textureLoader.load(ch.depth);
       imgTex.minFilter = THREE.LinearFilter;
@@ -872,9 +924,31 @@
       depthTex.minFilter = THREE.LinearFilter;
       depthTex.magFilter = THREE.LinearFilter;
       depthTex.generateMipmaps = false;
-      loadedTextures.images[idx] = imgTex;
-      loadedTextures.depths[idx] = depthTex;
+      desktopTextures.images[idx] = imgTex;
+      desktopTextures.depths[idx] = depthTex;
     });
+
+    // Preload Mobile Textures
+    MOBILE_CHAPTERS.forEach((ch, idx) => {
+      const imgTex = textureLoader.load(ch.image);
+      const depthTex = textureLoader.load(ch.depth);
+      imgTex.minFilter = THREE.LinearFilter;
+      imgTex.magFilter = THREE.LinearFilter;
+      imgTex.generateMipmaps = false;
+      depthTex.minFilter = THREE.LinearFilter;
+      depthTex.magFilter = THREE.LinearFilter;
+      depthTex.generateMipmaps = false;
+      mobileTextures.images[idx] = imgTex;
+      mobileTextures.depths[idx] = depthTex;
+    });
+
+    function getActiveChapters() {
+      return isMobile ? MOBILE_CHAPTERS : DESKTOP_CHAPTERS;
+    }
+
+    function getActiveTextures() {
+      return isMobile ? mobileTextures : desktopTextures;
+    }
 
     // Custom Shader Vertex
     const vertexShader = `
@@ -957,21 +1031,31 @@
       }
     `;
 
-    // Uniforms
+    // Uniforms initialization based on active device (Desktop vs Mobile)
+    const initialTextures = getActiveTextures();
+    const initialChapters = getActiveChapters();
+
     const uniforms = {
-      u_imgCurrent: { value: loadedTextures.images[0] },
-      u_depthCurrent: { value: loadedTextures.depths[0] },
-      u_imgNext: { value: loadedTextures.images[0] },
-      u_depthNext: { value: loadedTextures.depths[0] },
+      u_imgCurrent: { value: initialTextures.images[0] },
+      u_depthCurrent: { value: initialTextures.depths[0] },
+      u_imgNext: { value: initialTextures.images[0] },
+      u_depthNext: { value: initialTextures.depths[0] },
       u_transition: { value: 0.0 },
       u_mouse: { value: new THREE.Vector2(0, 0) },
       u_drift: { value: new THREE.Vector2(0, 0) },
       u_focus: { value: 0.45 }, // Exact focus depth from workflow: (depth - 0.45)
       u_intensity: { value: 0.035 },
       u_resolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
-      u_imageRes: { value: new THREE.Vector2(1920, 1080) },
+      u_imageRes: { value: new THREE.Vector2(initialChapters[0].aspect[0], initialChapters[0].aspect[1]) },
       u_depthView: { value: false }
     };
+
+    // If initial load is on mobile, update the initial story text
+    if (isMobile) {
+      document.getElementById('story-tag').innerHTML = MOBILE_CHAPTERS[0].tag;
+      document.getElementById('story-title').innerHTML = MOBILE_CHAPTERS[0].title;
+      document.getElementById('story-desc').innerHTML = MOBILE_CHAPTERS[0].desc;
+    }
 
     const material = new THREE.ShaderMaterial({
       vertexShader: vertexShader,
@@ -1053,10 +1137,26 @@
       });
     }
 
-    // Window Resize
+    // Window Resize with Dynamic Device Mode Detection
     window.addEventListener('resize', () => {
       renderer.setSize(window.innerWidth, window.innerHeight);
       uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+
+      const wasMobile = isMobile;
+      isMobile = isMobileDevice();
+      
+      // If user rotated phone or resized browser across mobile/desktop breakpoint
+      if (wasMobile !== isMobile) {
+        const chapters = getActiveChapters();
+        const textures = getActiveTextures();
+        uniforms.u_imgCurrent.value = textures.images[currentChapterIndex];
+        uniforms.u_depthCurrent.value = textures.depths[currentChapterIndex];
+        uniforms.u_imageRes.value.set(chapters[currentChapterIndex].aspect[0], chapters[currentChapterIndex].aspect[1]);
+
+        document.getElementById('story-tag').innerHTML = chapters[currentChapterIndex].tag;
+        document.getElementById('story-title').innerHTML = chapters[currentChapterIndex].title;
+        document.getElementById('story-desc').innerHTML = chapters[currentChapterIndex].desc;
+      }
     });
 
     // --- Scene Transition Engine ---
@@ -1064,11 +1164,13 @@
       if (index === currentChapterIndex || isTransitioning) return;
       isTransitioning = true;
 
-      const nextIndex = (index + CHAPTERS.length) % CHAPTERS.length;
+      const chapters = getActiveChapters();
+      const textures = getActiveTextures();
+      const nextIndex = (index + chapters.length) % chapters.length;
       
-      // Update next textures
-      uniforms.u_imgNext.value = loadedTextures.images[nextIndex];
-      uniforms.u_depthNext.value = loadedTextures.depths[nextIndex];
+      // Update next textures & resolution
+      uniforms.u_imgNext.value = textures.images[nextIndex];
+      uniforms.u_depthNext.value = textures.depths[nextIndex];
       uniforms.u_transition.value = 0.0;
 
       // Update Nav Dots
@@ -1088,12 +1190,10 @@
         stagger: 0.05,
         ease: "power2.in",
         onComplete: () => {
-          // Change text
-          tagEl.innerHTML = CHAPTERS[nextIndex].tag;
-          titleEl.innerHTML = CHAPTERS[nextIndex].title;
-          descEl.innerHTML = CHAPTERS[nextIndex].desc;
+          tagEl.innerHTML = chapters[nextIndex].tag;
+          titleEl.innerHTML = chapters[nextIndex].title;
+          descEl.innerHTML = chapters[nextIndex].desc;
 
-          // Animate text back in
           gsap.fromTo([tagEl, titleEl, descEl], 
             { opacity: 0, y: 20 },
             { opacity: 1, y: 0, duration: 0.65, stagger: 0.1, ease: "power3.out" }
@@ -1107,9 +1207,9 @@
         duration: 1.1,
         ease: "power2.inOut",
         onComplete: () => {
-          // Set current to next
-          uniforms.u_imgCurrent.value = loadedTextures.images[nextIndex];
-          uniforms.u_depthCurrent.value = loadedTextures.depths[nextIndex];
+          uniforms.u_imgCurrent.value = textures.images[nextIndex];
+          uniforms.u_depthCurrent.value = textures.depths[nextIndex];
+          uniforms.u_imageRes.value.set(chapters[nextIndex].aspect[0], chapters[nextIndex].aspect[1]);
           uniforms.u_transition.value = 0.0;
           currentChapterIndex = nextIndex;
           isTransitioning = false;
